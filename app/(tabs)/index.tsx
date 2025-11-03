@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
 import { dashboardAPI } from '@/services/api';
-import { useState } from 'react';
 import { DashboardMetrics } from '@/types';
+import { useCallback } from 'react';
 
 export default function DashboardScreen() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -19,13 +19,38 @@ export default function DashboardScreen() {
   const { supplier } = useSelector((state: RootState) => state.auth);
 
   const fetchMetrics = async () => {
-    if (!supplier?.id) return;
+    console.log('📊 Fetching dashboard metrics');
+    console.log('📊 Supplier:', supplier);
+    console.log('📊 Supplier ID:', supplier?.id);
+    
+    if (!supplier?.id) {
+      console.log('❌ No supplier ID found');
+      return;
+    }
+    
     setLoading(true);
     try {
+      console.log('📊 Calling dashboard API with supplier_id:', supplier.id);
       const response = await dashboardAPI.getMetrics(supplier.id);
-      setMetrics(response.data);
+      console.log('📊 Dashboard metrics response:', response.data);
+      console.log('📊 Summary object:', response.data.summary);
+      console.log('📊 Customers array:', response.data.customers);
+      
+      // Extract from summary object if exists, otherwise from root
+      const summary = response.data.summary || response.data;
+      
+      // Map backend response to metrics (handle both camelCase and snake_case)
+      const metricsData = {
+        totalCustomers: summary.totalCustomers || summary.total_customers || response.data.customers?.length || 0,
+        pendingPayments: summary.pendingPayments || summary.pending_payments || 0,
+        completedPayments: summary.completedPayments || summary.completed_payments || 0,
+        activeOrders: summary.activeOrders || summary.active_orders || 0,
+      };
+      
+      console.log('📊 Mapped metrics:', metricsData);
+      setMetrics(metricsData);
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
+      console.error('❌ Failed to fetch metrics:', error);
     } finally {
       setLoading(false);
     }
@@ -34,6 +59,15 @@ export default function DashboardScreen() {
   useEffect(() => {
     fetchMetrics();
   }, [supplier?.id]);
+
+  // Refresh metrics when tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (supplier?.id) {
+        fetchMetrics();
+      }
+    }, [supplier?.id])
+  );
 
   return (
     <ScrollView

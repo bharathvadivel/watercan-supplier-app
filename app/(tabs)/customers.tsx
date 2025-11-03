@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Card, Text, FAB, Searchbar, Chip } from 'react-native-paper';
+import { Card, Text, FAB, Searchbar, Chip, ActivityIndicator } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
-import { fetchCustomers, setSelectedCustomer } from '@/store/slices/customerSlice';
+import { fetchCustomers, setSelectedCustomer, restoreCustomers } from '@/store/slices/customerSlice';
 import { Customer } from '@/types';
 
 export default function CustomersScreen() {
@@ -13,72 +13,109 @@ export default function CustomersScreen() {
   const { customers, loading } = useSelector((state: RootState) => state.customers);
   const { supplier } = useSelector((state: RootState) => state.auth);
 
+  // Restore customers from storage on mount
+  useEffect(() => {
+    dispatch(restoreCustomers());
+  }, [dispatch]);
+
+  // Fetch fresh data when supplier is available
   useEffect(() => {
     if (supplier?.id) {
+      console.log('👥 Fetching customers for supplier:', supplier.id);
       dispatch(fetchCustomers(supplier.id));
     }
-  }, [supplier?.id]);
+  }, [supplier?.id, dispatch]);
 
-  const filteredCustomers = customers.filter((customer) =>
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phoneNumber.includes(searchQuery)
+  // Refresh customers when tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (supplier?.id) {
+        console.log('👥 Refreshing customers on focus');
+        dispatch(fetchCustomers(supplier.id));
+      }
+    }, [supplier?.id, dispatch])
   );
+
+  useEffect(() => {
+    console.log('👥 Customers in state:', customers.length);
+    customers.forEach((customer, index) => {
+      console.log(`Customer ${index}:`, JSON.stringify(customer, null, 2));
+    });
+  }, [customers]);
+
+  const filteredCustomers = customers.filter((customer) => {
+    const name = customer.customer_name || '';
+    const phone = customer.customer_phone || '';
+    return (
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phone.includes(searchQuery)
+    );
+  });
 
   const handleCustomerPress = (customer: Customer) => {
     dispatch(setSelectedCustomer(customer));
-    router.push(`/customers/${customer.id}`);
+    router.push(`/customers/${customer.location_id}`);
   };
 
-  const renderCustomer = ({ item }: { item: Customer }) => (
-    <Card
-      style={styles.customerCard}
-      mode="elevated"
-      onPress={() => handleCustomerPress(item)}>
-      <Card.Content>
-        <View style={styles.customerHeader}>
-          <View style={styles.customerInfo}>
-            <Text variant="titleMedium" style={styles.customerName}>
-              {item.name}
-            </Text>
-            <Text variant="bodyMedium" style={styles.phoneNumber}>
-              {item.phoneNumber}
-            </Text>
+  const renderCustomer = ({ item }: { item: Customer }) => {
+    const name = item.customer_name || 'Unknown';
+    const phone = item.customer_phone || '';
+    const isOnboarded = item.profile_status ?? false;
+    
+    return (
+      <Card
+        style={styles.customerCard}
+        mode="elevated"
+        onPress={() => handleCustomerPress(item)}>
+        <Card.Content>
+          <View style={styles.customerHeader}>
+            <View style={styles.customerInfo}>
+              <Text variant="titleMedium" style={styles.customerName}>
+                {name}
+              </Text>
+              <Text variant="bodyMedium" style={styles.phoneNumber}>
+                {phone}
+              </Text>
+              <Text variant="bodySmall" style={styles.locationText}>
+                📍 {item.customer_area}, {item.city}
+              </Text>
+            </View>
+            <Chip
+              mode="flat"
+              style={isOnboarded ? styles.onboardedChip : styles.pendingChip}>
+              {isOnboarded ? 'Active' : 'Pending'}
+            </Chip>
           </View>
-          <Chip
-            mode="flat"
-            style={item.isOnboarded ? styles.onboardedChip : styles.pendingChip}>
-            {item.isOnboarded ? 'Active' : 'Pending'}
-          </Chip>
-        </View>
-        <View style={styles.customerDetails}>
-          <View style={styles.detailItem}>
-            <Text variant="bodySmall" style={styles.detailLabel}>
-              Per Can Amount
-            </Text>
-            <Text variant="bodyMedium" style={styles.detailValue}>
-              ₹{item.perCanAmount}
-            </Text>
+          <View style={styles.customerDetails}>
+            <View style={styles.detailItem}>
+              <Text variant="bodySmall" style={styles.detailLabel}>
+                Per Can Amount
+              </Text>
+              <Text variant="bodyMedium" style={styles.detailValue}>
+                ₹{item.per_can_amount || 0}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Text variant="bodySmall" style={styles.detailLabel}>
+                Balance Due
+              </Text>
+              <Text variant="bodyMedium" style={[styles.detailValue, styles.dueText]}>
+                ₹{item.due_amount || 0}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Text variant="bodySmall" style={styles.detailLabel}>
+                Credit Amount
+              </Text>
+              <Text variant="bodyMedium" style={[styles.detailValue, styles.creditText]}>
+                ₹{item.credit_amount || 0}
+              </Text>
+            </View>
           </View>
-          <View style={styles.detailItem}>
-            <Text variant="bodySmall" style={styles.detailLabel}>
-              Balance Due
-            </Text>
-            <Text variant="bodyMedium" style={[styles.detailValue, styles.dueText]}>
-              ₹{item.balanceDue}
-            </Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text variant="bodySmall" style={styles.detailLabel}>
-              Credit Amount
-            </Text>
-            <Text variant="bodyMedium" style={[styles.detailValue, styles.creditText]}>
-              ₹{item.creditAmount}
-            </Text>
-          </View>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+        </Card.Content>
+      </Card>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -97,7 +134,7 @@ export default function CustomersScreen() {
       <FlatList
         data={filteredCustomers}
         renderItem={renderCustomer}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.location_id)}
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={() => supplier?.id && dispatch(fetchCustomers(supplier.id))}
@@ -123,6 +160,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     padding: 16,
@@ -158,6 +199,11 @@ const styles = StyleSheet.create({
   },
   phoneNumber: {
     color: '#666',
+  },
+  locationText: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
   },
   onboardedChip: {
     backgroundColor: '#e8f5e9',

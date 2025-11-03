@@ -13,6 +13,14 @@ const setSecureItem = async (key: string, value: string) => {
   }
 };
 
+const getSecureItem = async (key: string): Promise<string | null> => {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem(key);
+  } else {
+    return await SecureStore.getItemAsync(key);
+  }
+};
+
 const deleteSecureItem = async (key: string) => {
   if (Platform.OS === 'web') {
     localStorage.removeItem(key);
@@ -79,6 +87,12 @@ export const verifyOTPAndSignup = createAsyncThunk(
       if (response.data.token) {
         await setSecureItem('authToken', response.data.token);
       }
+      
+      // Persist supplier data to storage
+      if (response.data.supplier) {
+        await setSecureItem('supplierData', JSON.stringify(response.data.supplier));
+      }
+      
       return response.data.supplier;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to verify OTP');
@@ -109,13 +123,52 @@ export const loginWithPIN = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      console.log('🔐 Login attempt:', { phoneNumber, pin });
       const response = await authAPI.loginWithPIN({ phoneNumber, pin });
+      console.log('🔐 Login response:', response.data);
+      
       if (response.data.token) {
         await setSecureItem('authToken', response.data.token);
       }
-      return response.data.supplier;
+      
+      // Map backend response to supplier object
+      const supplierData = {
+        id: response.data.supplier_id,
+        phone_no: response.data.phone_number,
+        name: response.data.supplier_name,
+        brand_name: response.data.supplier_brand_name,
+        fcm_token: response.data.fcm_token
+      };
+      
+      // Persist supplier data to storage
+      await setSecureItem('supplierData', JSON.stringify(supplierData));
+      
+      console.log('🔐 Supplier data to store:', supplierData);
+      return supplierData;
     } catch (error: any) {
+      console.error('❌ Login error:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Invalid PIN');
+    }
+  }
+);
+
+export const restoreSession = createAsyncThunk(
+  'auth/restoreSession',
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Attempting to restore session...');
+      const supplierData = await getSecureItem('supplierData');
+      
+      if (supplierData) {
+        console.log('✅ Session restored from storage');
+        return JSON.parse(supplierData) as Supplier;
+      }
+      
+      console.log('ℹ️ No session found in storage');
+      return rejectWithValue('No session found');
+    } catch (error: any) {
+      console.error('❌ Failed to restore session:', error);
+      return rejectWithValue('Failed to restore session');
     }
   }
 );
@@ -123,6 +176,14 @@ export const loginWithPIN = createAsyncThunk(
 export const logout = createAsyncThunk('auth/logout', async () => {
   await deleteSecureItem('authToken');
   await deleteSecureItem('userPIN');
+  await deleteSecureItem('supplierData');
+  
+  // Clear customer data from storage
+  if (Platform.OS === 'web') {
+    localStorage.removeItem('customersData');
+  } else {
+    await SecureStore.deleteItemAsync('customersData');
+  }
 });
 
 const authSlice = createSlice({
@@ -193,6 +254,19 @@ const authSlice = createSlice({
         state.supplier = null;
         state.isAuthenticated = false;
         state.otpSent = false;
+      })
+      .addCase(restoreSession.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(restoreSession.fulfilled, (state, action) => {
+        state.loading = false;
+        state.supplier = action.payload;
+        state.isAuthenticated = true;
+      })
+      .addCase(restoreSession.rejected, (state) => {
+        state.loading = false;
+        state.supplier = null;
+        state.isAuthenticated = false;
       });
   },
 });

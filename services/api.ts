@@ -84,11 +84,11 @@ export const authAPI = {
 };
 
 export const customerAPI = {
-  getCustomers: (supplierId: string) =>
-    apiClient.get(`/customers?supplierId=${supplierId}`),
+  getCustomers: (supplierId: number) =>
+    apiClient.get(`/supplier/dashboard/${supplierId}`),
 
   createCustomer: (data: any) =>
-    apiClient.post('/customers', data),
+    apiClient.post('/supplier/add-customer-billing', data),
 
   updateCustomer: (customerId: string, data: any) =>
     apiClient.patch(`/customers/${customerId}`, data),
@@ -139,8 +139,10 @@ export const notificationAPI = {
 };
 
 export const dashboardAPI = {
-  getMetrics: (supplierId: string) =>
-    apiClient.get(`/dashboard/metrics?supplierId=${supplierId}`),
+  getMetrics: (supplierId: number) => {
+    console.log('📊 Dashboard API - Getting metrics for supplier_id:', supplierId);
+    return apiClient.get(`/supplier/dashboard/${supplierId}`);
+  },
 };
 
 export default apiClient;
