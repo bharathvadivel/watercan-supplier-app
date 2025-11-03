@@ -2,6 +2,24 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Supplier } from '@/types';
 import { authAPI } from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+// Helper functions for cross-platform storage
+const setSecureItem = async (key: string, value: string) => {
+  if (Platform.OS === 'web') {
+    localStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+};
+
+const deleteSecureItem = async (key: string) => {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+};
 
 interface AuthState {
   supplier: Supplier | null;
@@ -9,6 +27,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   otpSent: boolean;
+  tempSupplierId: number | null;
 }
 
 const initialState: AuthState = {
@@ -17,15 +36,33 @@ const initialState: AuthState = {
   loading: false,
   error: null,
   otpSent: false,
+  tempSupplierId: null,
 };
 
 export const sendOTP = createAsyncThunk(
   'auth/sendOTP',
-  async (phoneNumber: string, { rejectWithValue }) => {
+  async ({ phoneNumber, name }: { phoneNumber: string; name: string }, { rejectWithValue }) => {
     try {
-      const response = await authAPI.sendOTP(phoneNumber);
-      return response.data;
+      console.log('Sending OTP to:', phoneNumber, 'Name:', name);
+      const sendResponse = await authAPI.sendOTP(phoneNumber, name);
+      console.log('OTP Send Response:', sendResponse.data);
+      
+      // Fetch the OTP from the get-otp endpoint
+      const otpResponse = await authAPI.getOTP(phoneNumber);
+      console.log('OTP Fetched:', otpResponse.data);
+      
+      // Import and show notification with OTP
+      const { showOTPNotification } = await import('@/services/notifications');
+      if (otpResponse.data.otp) {
+        await showOTPNotification(otpResponse.data.otp);
+      }
+      
+      return { 
+        supplier_id: sendResponse.data.supplier_id,
+        otp: otpResponse.data.otp 
+      };
     } catch (error: any) {
+      console.error('OTP Error:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data?.message || 'Failed to send OTP');
     }
   }
@@ -34,13 +71,13 @@ export const sendOTP = createAsyncThunk(
 export const verifyOTPAndSignup = createAsyncThunk(
   'auth/verifyOTPAndSignup',
   async (
-    { phoneNumber, otp, name }: { phoneNumber: string; otp: string; name: string },
+    { phoneNumber, otp, name, supplierId }: { phoneNumber: string; otp: string; name: string; supplierId: number },
     { rejectWithValue }
   ) => {
     try {
-      const response = await authAPI.verifyOTPAndSignup({ phoneNumber, otp, name });
+      const response = await authAPI.verifyOTPAndSignup({ phoneNumber, otp, name, supplierId });
       if (response.data.token) {
-        await SecureStore.setItemAsync('authToken', response.data.token);
+        await setSecureItem('authToken', response.data.token);
       }
       return response.data.supplier;
     } catch (error: any) {
@@ -52,12 +89,12 @@ export const verifyOTPAndSignup = createAsyncThunk(
 export const setupPIN = createAsyncThunk(
   'auth/setupPIN',
   async (
-    { supplierId, pin }: { supplierId: string; pin: string },
+    { supplierId, pin }: { supplierId: number; pin: string },
     { rejectWithValue }
   ) => {
     try {
       const response = await authAPI.setupPIN({ supplierId, pin });
-      await SecureStore.setItemAsync('userPIN', pin);
+      await setSecureItem('userPIN', pin);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to setup PIN');
@@ -74,7 +111,7 @@ export const loginWithPIN = createAsyncThunk(
     try {
       const response = await authAPI.loginWithPIN({ phoneNumber, pin });
       if (response.data.token) {
-        await SecureStore.setItemAsync('authToken', response.data.token);
+        await setSecureItem('authToken', response.data.token);
       }
       return response.data.supplier;
     } catch (error: any) {
@@ -84,8 +121,8 @@ export const loginWithPIN = createAsyncThunk(
 );
 
 export const logout = createAsyncThunk('auth/logout', async () => {
-  await SecureStore.deleteItemAsync('authToken');
-  await SecureStore.deleteItemAsync('userPIN');
+  await deleteSecureItem('authToken');
+  await deleteSecureItem('userPIN');
 });
 
 const authSlice = createSlice({
@@ -106,9 +143,10 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(sendOTP.fulfilled, (state) => {
+      .addCase(sendOTP.fulfilled, (state, action) => {
         state.loading = false;
         state.otpSent = true;
+        state.tempSupplierId = action.payload.supplier_id;
       })
       .addCase(sendOTP.rejected, (state, action) => {
         state.loading = false;

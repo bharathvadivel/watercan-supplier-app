@@ -11,7 +11,7 @@ export default function SetupPinScreen() {
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
   const dispatch = useDispatch<AppDispatch>();
-  const { loading, supplier, error } = useSelector((state: RootState) => state.auth);
+  const { loading, supplier, tempSupplierId, error } = useSelector((state: RootState) => state.auth);
 
   const handleSetupPin = async () => {
     if (pin !== confirmPin) {
@@ -24,8 +24,9 @@ export default function SetupPinScreen() {
       return;
     }
 
-    if (supplier?.id) {
-      const result = await dispatch(setupPIN({ supplierId: supplier.id, pin }));
+    const supplierId = tempSupplierId || supplier?.id;
+    if (supplierId) {
+      const result = await dispatch(setupPIN({ supplierId: Number(supplierId), pin }));
       if (setupPIN.fulfilled.match(result)) {
         router.replace('/(tabs)');
       }

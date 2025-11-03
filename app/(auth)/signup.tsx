@@ -11,17 +11,17 @@ export default function SignupScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const dispatch = useDispatch<AppDispatch>();
-  const { loading, error, otpSent } = useSelector((state: RootState) => state.auth);
+  const { loading, error, otpSent, tempSupplierId } = useSelector((state: RootState) => state.auth);
 
   const handleSendOTP = async () => {
-    if (phoneNumber.length === 10) {
-      await dispatch(sendOTP(phoneNumber));
+    if (phoneNumber.length === 10 && name.trim()) {
+      await dispatch(sendOTP({ phoneNumber, name }));
     }
   };
 
   const handleVerifyOTP = async () => {
-    if (otp.length === 6 && name.trim()) {
-      const result = await dispatch(verifyOTPAndSignup({ phoneNumber, otp, name }));
+    if (otp.length === 4 && name.trim() && tempSupplierId) {
+      const result = await dispatch(verifyOTPAndSignup({ phoneNumber, otp, name, supplierId: tempSupplierId }));
       if (verifyOTPAndSignup.fulfilled.match(result)) {
         router.replace('/(auth)/setup-pin');
       }
@@ -74,19 +74,19 @@ export default function SignupScreen() {
         ) : (
           <>
             <TextInput
-              label="Enter OTP"
+              label="Enter 4-Digit OTP"
               value={otp}
               onChangeText={setOtp}
               mode="outlined"
               keyboardType="number-pad"
-              maxLength={6}
+              maxLength={4}
               style={styles.input}
             />
             <Button
               mode="contained"
               onPress={handleVerifyOTP}
               loading={loading}
-              disabled={loading || otp.length !== 6}
+              disabled={loading || otp.length !== 4}
               style={styles.button}>
               Verify OTP
             </Button>

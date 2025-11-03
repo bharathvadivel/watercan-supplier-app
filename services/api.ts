@@ -1,7 +1,8 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -10,12 +11,38 @@ const apiClient = axios.create({
   },
 });
 
+// Helper function to safely get/set tokens across platforms
+const getToken = async () => {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem('authToken');
+  }
+  return await SecureStore.getItemAsync('authToken');
+};
+
+const setToken = async (token: string) => {
+  if (Platform.OS === 'web') {
+    localStorage.setItem('authToken', token);
+  } else {
+    await SecureStore.setItemAsync('authToken', token);
+  }
+};
+
+const deleteToken = async () => {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem('authToken');
+  } else {
+    await SecureStore.deleteItemAsync('authToken');
+  }
+};
+
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('authToken');
+    const token = await getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('Request URL:', config.url);
+    console.log('Request Data:', JSON.stringify(config.data));
     return config;
   },
   (error) => {
@@ -24,17 +51,36 @@ apiClient.interceptors.request.use(
 );
 
 export const authAPI = {
-  sendOTP: (phoneNumber: string) =>
-    apiClient.post('/auth/send-otp', { phoneNumber }),
+  sendOTP: (phoneNumber: string, name: string) => {
+    console.log('API: Sending phone number:', phoneNumber, 'Name:', name, 'Type:', typeof phoneNumber, 'Length:', phoneNumber.length);
+    return apiClient.post('/supplier/send-otp', { 
+      phone_number: phoneNumber,
+      name: name
+    });
+  },
 
-  verifyOTPAndSignup: (data: { phoneNumber: string; otp: string; name: string }) =>
-    apiClient.post('/auth/verify-otp-signup', data),
+  getOTP: (phoneNumber: string) =>
+    apiClient.get(`/supplier/get-otp?phone_number=${phoneNumber}`),
 
-  setupPIN: (data: { supplierId: string; pin: string }) =>
-    apiClient.post('/auth/setup-pin', data),
+  verifyOTPAndSignup: (data: { phoneNumber: string; otp: string; name: string; supplierId: number }) =>
+    apiClient.post('/supplier/verify-otp', { 
+      phone_number: data.phoneNumber, 
+      otp: data.otp,
+      name: data.name,
+      supplier_id: data.supplierId
+    }),
+
+  setupPIN: (data: { supplierId: number; pin: string }) =>
+    apiClient.post('/supplier/set-passcode', { 
+      supplier_id: data.supplierId,
+      passcode: data.pin
+    }),
 
   loginWithPIN: (data: { phoneNumber: string; pin: string }) =>
-    apiClient.post('/auth/login-pin', data),
+    apiClient.post('/supplier/login', { 
+      phone_number: data.phoneNumber,
+      passcode: data.pin
+    }),
 };
 
 export const customerAPI = {
