@@ -21,7 +21,7 @@ export default function AddCustomerScreen() {
   const [address, setAddress] = useState('');
   const [perCanAmount, setPerCanAmount] = useState('');
   const [refillFrequency, setRefillFrequency] = useState('');
-  const [billingType, setBillingType] = useState<'monthly' | 'weekly'>('monthly');
+  const [billingType, setBillingType] = useState<'monthly' | 'regular'>('monthly');
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
   const [city, setCity] = useState('');
@@ -211,10 +211,10 @@ export default function AddCustomerScreen() {
           </Text>
           <SegmentedButtons
             value={billingType}
-            onValueChange={(value) => setBillingType(value as 'monthly' | 'weekly')}
+            onValueChange={(value) => setBillingType(value as 'monthly' | 'regular')}
             buttons={[
               { value: 'monthly', label: 'Monthly' },
-              { value: 'weekly', label: 'Weekly' },
+              { value: 'regular', label: 'Regular' },
             ]}
             style={styles.segmentedButtons}
           />

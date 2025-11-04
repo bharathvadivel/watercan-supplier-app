@@ -145,4 +145,12 @@ export const dashboardAPI = {
   },
 };
 
+export const deliveryPersonAPI = {
+  addDeliveryPerson: (data: { supplier_id: number; name: string; phone_number: string }) =>
+    apiClient.post('/delivery-person/add', data),
+  
+  getPasscode: (deliveryPersonId: number) =>
+    apiClient.get(`/delivery-person/get-passcode/${deliveryPersonId}`),
+};
+
 export default apiClient;

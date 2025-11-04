@@ -55,6 +55,7 @@ export interface Payment {
 
 export interface DashboardMetrics {
   totalCustomers: number;
+  totalDeliveryPersons: number;
   pendingPayments: number;
   completedPayments: number;
   activeOrders: number;

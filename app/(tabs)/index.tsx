@@ -11,6 +11,7 @@ import { useCallback } from 'react';
 export default function DashboardScreen() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalCustomers: 0,
+    totalDeliveryPersons: 0,
     pendingPayments: 0,
     completedPayments: 0,
     activeOrders: 0,
@@ -42,6 +43,7 @@ export default function DashboardScreen() {
       // Map backend response to metrics (handle both camelCase and snake_case)
       const metricsData = {
         totalCustomers: summary.totalCustomers || summary.total_customers || response.data.customers?.length || 0,
+        totalDeliveryPersons: summary.totalDeliveryPersons || summary.total_delivery_persons || summary.total_delivery_person || 0,
         pendingPayments: summary.pendingPayments || summary.pending_payments || 0,
         completedPayments: summary.completedPayments || summary.completed_payments || 0,
         activeOrders: summary.activeOrders || summary.active_orders || 0,
@@ -99,6 +101,17 @@ export default function DashboardScreen() {
         <Card style={styles.metricCard} mode="elevated">
           <Card.Content>
             <Text variant="bodyLarge" style={styles.metricLabel}>
+              Delivery Persons
+            </Text>
+            <Text variant="displaySmall" style={styles.metricValue}>
+              {metrics.totalDeliveryPersons}
+            </Text>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.metricCard} mode="elevated">
+          <Card.Content>
+            <Text variant="bodyLarge" style={styles.metricLabel}>
               Active Orders
             </Text>
             <Text variant="displaySmall" style={styles.metricValue}>
@@ -139,6 +152,12 @@ export default function DashboardScreen() {
           onPress={() => router.push('/customers/add')}
           style={styles.actionButton}>
           Add New Customer
+        </Button>
+        <Button
+          mode="contained"
+          onPress={() => router.push('/delivery/add')}
+          style={styles.actionButton}>
+          Add Delivery Person
         </Button>
         <Button
           mode="outlined"
