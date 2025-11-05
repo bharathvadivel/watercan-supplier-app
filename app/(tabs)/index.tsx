@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Card, Text, Button } from 'react-native-paper';
+import { Card, Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { router, useFocusEffect } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
 import { dashboardAPI } from '@/services/api';
 import { DashboardMetrics } from '@/types';
-import { useCallback } from 'react';
 
 export default function DashboardScreen() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -70,6 +69,16 @@ export default function DashboardScreen() {
       }
     }, [supplier?.id])
   );
+
+  // Show loading while supplier is being restored
+  if (!supplier) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 16 }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView

@@ -35,17 +35,46 @@ const deleteToken = async () => {
   }
 };
 
+// Store request timestamps
+const requestTimestamps = new Map<string, number>();
+
 apiClient.interceptors.request.use(
   async (config) => {
     const token = await getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('Request URL:', config.url);
-    console.log('Request Data:', JSON.stringify(config.data));
+    // Store start time
+    const requestId = `${config.method}_${config.url}_${Date.now()}`;
+    requestTimestamps.set(requestId, Date.now());
+    (config as any).requestId = requestId;
+    
+    console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+apiClient.interceptors.response.use(
+  (response) => {
+    // Calculate request duration
+    const requestId = (response.config as any).requestId;
+    const startTime = requestTimestamps.get(requestId) || Date.now();
+    const duration = Date.now() - startTime;
+    requestTimestamps.delete(requestId);
+    
+    console.log(`⚡ API Response: ${response.config.url} (${duration}ms)`);
+    return response;
+  },
+  (error) => {
+    const requestId = (error.config as any)?.requestId;
+    const startTime = requestTimestamps.get(requestId) || Date.now();
+    const duration = Date.now() - startTime;
+    if (requestId) requestTimestamps.delete(requestId);
+    
+    console.log(`❌ API Error: ${error.config?.url} (${duration}ms)`, error.response?.status);
     return Promise.reject(error);
   }
 );
@@ -106,6 +135,48 @@ export const orderAPI = {
     return apiClient.get(`/orders${params}`);
   },
 
+  getAllOrders: (supplierId: number) => {
+    console.log('📦 Fetching all orders for supplier_id:', supplierId);
+    // Get all order IDs first (this returns basic order info)
+    return apiClient.get(`/supplier/pending-orders?supplier_id=${supplierId}`);
+  },
+
+  getPendingOrders: (supplierId: number) => {
+    console.log('📦 Fetching pending orders for supplier_id:', supplierId);
+    return apiClient.get(`/supplier/pending-orders?supplier_id=${supplierId}`);
+  },
+  
+  getAcceptedOrders: (supplierId: number) => {
+    console.log('📦 Fetching accepted orders for supplier_id:', supplierId);
+    return apiClient.get(`/supplier/accepted-orders?supplier_id=${supplierId}`);
+  },
+  
+  getDeliveredOrders: (supplierId: number) => {
+    console.log('📦 Fetching delivered orders for supplier_id:', supplierId);
+    return apiClient.get(`/supplier/delivered-orders?supplier_id=${supplierId}`);
+  },
+
+  getOrderStatus: (orderId: number) => {
+    console.log('📋 Fetching order status for order_id:', orderId);
+    return apiClient.get(`/supplier/order-status/${orderId}`);
+  },
+
+  acceptOrder: (data: { order_id: number; supplier_id: number; delivery_person_id: number }) => {
+    console.log('✅ Accepting order:', data);
+    return apiClient.post('/supplier/accept-order', data);
+  },
+
+  completeOrder: (data: {
+    order_id: number;
+    supplier_id: number;
+    bill_status: string;
+    payment_mode: string;
+    amount_paid: string;
+  }) => {
+    console.log('🎉 Completing order:', data);
+    return apiClient.post('/supplier/complete-order', data);
+  },
+
   updateOrderStatus: (orderId: string, status: string) =>
     apiClient.patch(`/orders/${orderId}`, { status, deliveredAt: new Date().toISOString() }),
 
@@ -151,6 +222,9 @@ export const deliveryPersonAPI = {
   
   getPasscode: (deliveryPersonId: number) =>
     apiClient.get(`/delivery-person/get-passcode/${deliveryPersonId}`),
+  
+  getDeliveryPersons: (supplierId: number) =>
+    apiClient.get(`/supplier/delivery-persons?supplier_id=${supplierId}`),
 };
 
 export default apiClient;
