@@ -55,6 +55,37 @@ export default function OrdersScreen() {
   const [amountPaid, setAmountPaid] = useState('');
   const { supplier, loading: authLoading } = useSelector((state: RootState) => state.auth);
 
+  // Helper function to map backend response to Order interface
+  const mapOrderResponse = (orderData: any): Order => {
+    if (!orderData) {
+      console.warn('⚠️ Received null/undefined order data');
+      return null as any;
+    }
+    
+    // Handle both flat structure (pending) and nested structure (accepted/delivered)
+    const isFlat = !!orderData.customer_name; // Flat structure has customer_name directly
+    
+    return {
+      order_id: orderData.order_id,
+      customer_name: isFlat ? orderData.customer_name : (orderData.customer?.customer_name || ''),
+      customer_phone: isFlat ? orderData.customer_phone : (orderData.customer?.customer_phone || ''),
+      customer_address: isFlat ? '' : (orderData.customer?.address?.customer_address || ''),
+      order_date: orderData.order_date,
+      delivery_date: orderData.delivery_date,
+      total_can_qty: isFlat ? orderData.total_can_qty : (orderData.order_details?.total_can_qty || 0),
+      per_can_price: isFlat ? String(orderData.per_can_price) : String(orderData.order_details?.per_can_price || 0),
+      total_price: isFlat ? String(orderData.total_price) : String(orderData.order_details?.total_price || 0),
+      billing_type: isFlat ? orderData.billing_type : (orderData.order_details?.billing_type || ''),
+      payment_mode: isFlat ? orderData.payment_mode : (orderData.payment_info?.payment_mode || ''),
+      bill_status: isFlat ? orderData.bill_status : (orderData.payment_info?.bill_status || ''),
+      order_status: orderData.order_status || '',
+      delivery_person_id: orderData.delivery_info?.delivered_by,
+      delivery_person_name: orderData.delivery_info?.delivered_by_name,
+      accepted_at: orderData.accepted_at,
+      completed_at: orderData.completed_at,
+    };
+  };
+
   const fetchAllOrders = useCallback(async (suppressLoading = false) => {
     if (!supplier?.id) {
       console.log('ℹ️ No supplier ID available');
@@ -86,20 +117,22 @@ export default function OrdersScreen() {
         })
       ]);
       
-      console.log('� Pending response:', JSON.stringify(pendingResponse.data, null, 2));
+      console.log('📦 Pending response:', JSON.stringify(pendingResponse.data, null, 2));
       console.log('📦 Accepted response:', JSON.stringify(acceptedResponse.data, null, 2));
       console.log('📦 Delivered response:', JSON.stringify(deliveredResponse.data, null, 2));
       
-      // Extract orders from responses
+      // Extract and map orders from responses
       const extractOrders = (response: any) => {
+        let orders = [];
         if (Array.isArray(response.data)) {
-          return response.data;
+          orders = response.data;
         } else if (response.data.orders) {
-          return response.data.orders;
+          orders = response.data.orders;
         } else if (response.data.data) {
-          return response.data.data;
+          orders = response.data.data;
         }
-        return [];
+        // Map the nested structure to flat Order interface
+        return orders.map(mapOrderResponse).filter(Boolean);
       };
       
       const pending = extractOrders(pendingResponse);
@@ -147,22 +180,56 @@ export default function OrdersScreen() {
     if (!supplier?.id || !selectedOrder) return;
 
     try {
-      await orderAPI.acceptOrder({
+      console.log('📋 Accepting order:', {
+        order_id: selectedOrder.order_id,
+        current_status: selectedOrder.order_status,
+        supplier_id: supplier.id
+      });
+      
+      const response = await orderAPI.acceptOrder({
         order_id: selectedOrder.order_id,
         supplier_id: supplier.id,
         delivery_person_id: supplier.id,
       });
       
+      console.log('✅ Accept response:', response.data);
+      
       const updatedOrder = { ...selectedOrder, order_status: 'accepted' };
-      setPendingOrders(prev => prev.filter(o => o.order_id !== selectedOrder.order_id));
-      setAcceptedOrders(prev => [...prev, updatedOrder]);
+      
+      console.log('📋 Removing from pending (current count:', pendingOrders.length, ')');
+      setPendingOrders(prev => {
+        const filtered = prev.filter(o => o.order_id !== selectedOrder.order_id);
+        console.log('📋 New pending count:', filtered.length);
+        return filtered;
+      });
+      
+      console.log('📋 Adding to accepted (current count:', acceptedOrders.length, ')');
+      setAcceptedOrders(prev => {
+        const updated = [...prev, updatedOrder];
+        console.log('📋 New accepted count:', updated.length);
+        return updated;
+      });
       
       setShowAcceptDialog(false);
       setSelectedOrder(null);
-      alert('Order accepted!');
+      
+      // Refresh orders to get latest state from backend
+      fetchAllOrders(true);
     } catch (error: any) {
       console.error('❌ Accept failed:', error);
-      alert('Failed to accept order');
+      console.error('❌ Error details:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || 'Failed to accept order';
+      
+      if (error.response?.status === 401) {
+        if (errorMessage.includes('already been accepted')) {
+          // Order already accepted, just refresh
+          fetchAllOrders(true);
+        }
+      }
+      
+      setShowAcceptDialog(false);
+      setSelectedOrder(null);
     }
   };
 
@@ -182,34 +249,61 @@ export default function OrdersScreen() {
   };
 
   const handleCompleteOrderClick = (order: Order) => {
+    console.log('🎯 handleCompleteOrderClick called for order:', order.order_id);
+    console.log('🎯 Order details:', { 
+      order_id: order.order_id, 
+      status: order.order_status,
+      total_price: order.total_price 
+    });
+    
     setSelectedOrder(order);
     setAmountPaid(order.total_price);
+    setBillStatus('paid');
+    setPaymentMode('cash');
     setShowCompleteDialog(true);
+    
+    console.log('🎯 Dialog should be visible now. showCompleteDialog:', true);
   };
 
   const handleCompleteOrder = async () => {
     if (!supplier?.id || !selectedOrder || !amountPaid) return;
 
     try {
-      await orderAPI.completeOrder({
+      const payload = {
         order_id: selectedOrder.order_id,
         supplier_id: supplier.id,
         bill_status: billStatus,
         payment_mode: paymentMode,
         amount_paid: amountPaid,
-      });
+      };
+      
+      console.log('🎉 Completing order with payload:', payload);
+      const response = await orderAPI.completeOrder(payload);
+      console.log('🎉 Complete order response:', response.data);
 
-      const updatedOrder = { ...selectedOrder, order_status: 'completed', bill_status: billStatus };
+      const updatedOrder = { 
+        ...selectedOrder, 
+        order_status: 'delivered', // Change to 'delivered' instead of 'completed'
+        bill_status: billStatus,
+        payment_mode: paymentMode,
+      };
+      
       setAcceptedOrders(prev => prev.filter(o => o.order_id !== selectedOrder.order_id));
       setCompletedOrders(prev => [...prev, updatedOrder]);
       
       setShowCompleteDialog(false);
       setSelectedOrder(null);
       setAmountPaid('');
-      alert('Order completed!');
+      
+      // Refresh orders to get latest state from backend
+      fetchAllOrders(true);
     } catch (error: any) {
       console.error('❌ Complete failed:', error);
-      alert('Failed to complete order');
+      console.error('❌ Error response:', error.response?.data);
+      
+      setShowCompleteDialog(false);
+      setSelectedOrder(null);
+      setAmountPaid('');
     }
   };
 
@@ -238,14 +332,26 @@ export default function OrdersScreen() {
         <Text>Qty: {item.total_can_qty} cans • Total: ₹{item.total_price}</Text>
         <Text variant="bodySmall">{new Date(item.order_date).toLocaleDateString()}</Text>
 
-        {item.order_status === 'pending' && (
-          <Button mode="contained" onPress={() => handleAcceptOrderClick(item)} style={styles.actionButton}>
+        {(item.order_status === 'pending' || item.order_status === 'monthly_pending') && (
+          <Button 
+            mode="contained" 
+            onPress={() => {
+              console.log('🔘 Accept button clicked for order:', item.order_id);
+              handleAcceptOrderClick(item);
+            }} 
+            style={styles.actionButton}>
             Accept Order
           </Button>
         )}
         
         {item.order_status === 'accepted' && (
-          <Button mode="contained" onPress={() => handleCompleteOrderClick(item)} style={styles.actionButton}>
+          <Button 
+            mode="contained" 
+            onPress={() => {
+              console.log('🔘 Complete button clicked for order:', item.order_id, 'status:', item.order_status);
+              handleCompleteOrderClick(item);
+            }} 
+            style={styles.actionButton}>
             Complete Order
           </Button>
         )}

@@ -11,6 +11,14 @@ const apiClient = axios.create({
   },
 });
 
+// Public API client without authentication requirement
+const publicApiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Helper function to safely get/set tokens across platforms
 const getToken = async () => {
   if (Platform.OS === 'web') {
@@ -43,6 +51,9 @@ apiClient.interceptors.request.use(
     const token = await getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('🔑 Token found, adding to request');
+    } else {
+      console.warn('⚠️ No token found in storage!');
     }
     // Store start time
     const requestId = `${config.method}_${config.url}_${Date.now()}`;
@@ -143,27 +154,27 @@ export const orderAPI = {
 
   getPendingOrders: (supplierId: number) => {
     console.log('📦 Fetching pending orders for supplier_id:', supplierId);
-    return apiClient.get(`/supplier/pending-orders?supplier_id=${supplierId}`);
+    return publicApiClient.get(`/supplier/pending-orders?supplier_id=${supplierId}`);
   },
   
   getAcceptedOrders: (supplierId: number) => {
     console.log('📦 Fetching accepted orders for supplier_id:', supplierId);
-    return apiClient.get(`/supplier/accepted-orders?supplier_id=${supplierId}`);
+    return publicApiClient.get(`/supplier/accepted-orders?supplier_id=${supplierId}`);
   },
   
   getDeliveredOrders: (supplierId: number) => {
     console.log('📦 Fetching delivered orders for supplier_id:', supplierId);
-    return apiClient.get(`/supplier/delivered-orders?supplier_id=${supplierId}`);
+    return publicApiClient.get(`/supplier/delivered-orders?supplier_id=${supplierId}`);
   },
 
   getOrderStatus: (orderId: number) => {
     console.log('📋 Fetching order status for order_id:', orderId);
-    return apiClient.get(`/supplier/order-status/${orderId}`);
+    return publicApiClient.get(`/supplier/order-status/${orderId}`);
   },
 
   acceptOrder: (data: { order_id: number; supplier_id: number; delivery_person_id: number }) => {
     console.log('✅ Accepting order:', data);
-    return apiClient.post('/supplier/accept-order', data);
+    return publicApiClient.post('/supplier/accept-order', data);
   },
 
   completeOrder: (data: {
@@ -174,14 +185,14 @@ export const orderAPI = {
     amount_paid: string;
   }) => {
     console.log('🎉 Completing order:', data);
-    return apiClient.post('/supplier/complete-order', data);
+    return publicApiClient.post('/supplier/complete-order', data);
   },
 
   updateOrderStatus: (orderId: string, status: string) =>
-    apiClient.patch(`/orders/${orderId}`, { status, deliveredAt: new Date().toISOString() }),
+    publicApiClient.patch(`/orders/${orderId}`, { status, deliveredAt: new Date().toISOString() }),
 
   getOrderDetails: (orderId: string) =>
-    apiClient.get(`/orders/${orderId}`),
+    publicApiClient.get(`/orders/${orderId}`),
 };
 
 export const paymentAPI = {
