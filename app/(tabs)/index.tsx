@@ -6,6 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
 import { dashboardAPI } from '@/services/api';
 import { DashboardMetrics } from '@/types';
+import { setSupplier } from '@/store/slices/authSlice';
 
 export default function DashboardScreen() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -16,12 +17,16 @@ export default function DashboardScreen() {
     activeOrders: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [tenantName, setTenantName] = useState<string>('');
+  const dispatch = useDispatch<AppDispatch>();
   const { supplier } = useSelector((state: RootState) => state.auth);
 
   const fetchMetrics = async () => {
     console.log('📊 Fetching dashboard metrics');
-    console.log('📊 Supplier:', supplier);
+    console.log('📊 Supplier object:', supplier);
     console.log('📊 Supplier ID:', supplier?.id);
+    console.log('📊 Supplier name:', supplier?.name);
+    console.log('📊 Supplier brand_name:', supplier?.brand_name);
     
     if (!supplier?.id) {
       console.log('❌ No supplier ID found');
@@ -30,11 +35,31 @@ export default function DashboardScreen() {
     
     setLoading(true);
     try {
-      console.log('📊 Calling dashboard API with supplier_id:', supplier.id);
+      console.log('📊 Calling dashboard API with tenant_id:', supplier.id);
       const response = await dashboardAPI.getMetrics(supplier.id);
       console.log('📊 Dashboard metrics response:', response.data);
       console.log('📊 Summary object:', response.data.summary);
       console.log('📊 Customers array:', response.data.customers);
+      console.log('📊 Supplier from API:', response.data.supplier);
+      
+      // Update tenant name from API response
+      if (response.data.supplier) {
+        const apiSupplier = response.data.supplier;
+        const name = apiSupplier.tenant_name || apiSupplier.tenant_brand_name || '';
+        setTenantName(name);
+        console.log('📊 Setting tenant name:', name);
+        
+        // Update Redux state with latest supplier data
+        if (apiSupplier.tenant_name || apiSupplier.tenant_brand_name) {
+          dispatch(setSupplier({
+            id: apiSupplier.tenant_id,
+            phone_no: apiSupplier.phone_no,
+            name: apiSupplier.tenant_name,
+            brand_name: apiSupplier.tenant_brand_name,
+            fcm_token: supplier.fcm_token || ''
+          }));
+        }
+      }
       
       // Extract from summary object if exists, otherwise from root
       const summary = response.data.summary || response.data;
@@ -91,7 +116,7 @@ export default function DashboardScreen() {
           Dashboard
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
-          Welcome back, {supplier?.name}
+          Welcome back, {tenantName || supplier?.name || supplier?.brand_name || 'User'}!
         </Text>
       </View>
 

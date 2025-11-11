@@ -78,15 +78,16 @@ export default function ProfileScreen() {
               left={(props) => <List.Icon {...props} icon="cash" />}
               onPress={() => router.push('/payments/pending')}
             />
-            <List.Item
+            {/* <List.Item
               title="Payment History"
               left={(props) => <List.Icon {...props} icon="history" />}
               onPress={() => router.push('/payments/history')}
-            />
+            /> */}
           </List.Section>
         </Card.Content>
       </Card>
 
+      {/* Settings Card - Commented out until routes are created
       <Card style={styles.card} mode="elevated">
         <Card.Content>
           <List.Section>
@@ -108,6 +109,7 @@ export default function ProfileScreen() {
           </List.Section>
         </Card.Content>
       </Card>
+      */}
 
       <Button
         mode="contained"

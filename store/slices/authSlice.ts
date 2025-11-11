@@ -49,28 +49,37 @@ const initialState: AuthState = {
 
 export const sendOTP = createAsyncThunk(
   'auth/sendOTP',
-  async ({ phoneNumber, name }: { phoneNumber: string; name: string }, { rejectWithValue }) => {
+  async ({ phoneNumber, name, brandName, tenantType }: { phoneNumber: string; name: string; brandName?: string; tenantType: string }, { rejectWithValue }) => {
     try {
-      console.log('Sending OTP to:', phoneNumber, 'Name:', name);
-      const sendResponse = await authAPI.sendOTP(phoneNumber, name);
-      console.log('OTP Send Response:', sendResponse.data);
+      console.log('🚀 Sending OTP to:', phoneNumber, 'Name:', name, 'Brand Name:', brandName, 'Tenant Type:', tenantType);
+      const sendResponse = await authAPI.sendOTP(phoneNumber, name, brandName, tenantType);
+      console.log('📦 OTP Send Response:', sendResponse.data);
+      console.log('🔑 Tenant ID from response:', sendResponse.data.tenant_id);
+      console.log('🔍 Full response data:', JSON.stringify(sendResponse.data, null, 2));
       
       // Fetch the OTP from the get-otp endpoint
       const otpResponse = await authAPI.getOTP(phoneNumber);
-      console.log('OTP Fetched:', otpResponse.data);
+      console.log('📱 OTP Fetched:', otpResponse.data);
       
-      // Import and show notification with OTP
-      const { showOTPNotification } = await import('@/services/notifications');
-      if (otpResponse.data.otp) {
-        await showOTPNotification(otpResponse.data.otp);
+      // Import and show notification with OTP (optional, don't fail if it errors)
+      try {
+        const { showOTPNotification } = await import('@/services/notifications');
+        if (otpResponse.data.otp) {
+          await showOTPNotification(otpResponse.data.otp);
+        }
+      } catch (notificationError) {
+        console.log('⚠️ Notification not shown (non-critical):', notificationError);
       }
       
-      return { 
-        supplier_id: sendResponse.data.supplier_id,
+      const returnData = { 
+        tenant_id: sendResponse.data.tenant_id,
         otp: otpResponse.data.otp 
       };
+      console.log('✅ Returning from sendOTP:', returnData);
+      return returnData;
     } catch (error: any) {
-      console.error('OTP Error:', error.response?.data || error.message);
+      console.error('❌ OTP Error:', error.response?.data || error.message);
+      console.error('❌ Full error:', error);
       return rejectWithValue(error.response?.data?.message || 'Failed to send OTP');
     }
   }
@@ -79,11 +88,11 @@ export const sendOTP = createAsyncThunk(
 export const verifyOTPAndSignup = createAsyncThunk(
   'auth/verifyOTPAndSignup',
   async (
-    { phoneNumber, otp, name, supplierId }: { phoneNumber: string; otp: string; name: string; supplierId: number },
+    { phoneNumber, otp, name, tenantId }: { phoneNumber: string; otp: string; name: string; tenantId: number },
     { rejectWithValue }
   ) => {
     try {
-      const response = await authAPI.verifyOTPAndSignup({ phoneNumber, otp, name, supplierId });
+      const response = await authAPI.verifyOTPAndSignup({ phoneNumber, otp, name, tenantId });
       if (response.data.token) {
         await setSecureItem('authToken', response.data.token);
       }
@@ -103,13 +112,34 @@ export const verifyOTPAndSignup = createAsyncThunk(
 export const setupPIN = createAsyncThunk(
   'auth/setupPIN',
   async (
-    { supplierId, pin }: { supplierId: number; pin: string },
-    { rejectWithValue }
+    { tenantId, pin }: { tenantId: number; pin: string },
+    { rejectWithValue, getState }
   ) => {
     try {
-      const response = await authAPI.setupPIN({ supplierId, pin });
+      const response = await authAPI.setupPIN({ tenantId, pin });
       await setSecureItem('userPIN', pin);
-      return response.data;
+      
+      // Get current supplier data from state
+      const state = getState() as { auth: AuthState };
+      const currentSupplier = state.auth.supplier;
+      
+      // Create supplier object with tenant_id from response
+      const supplierData = {
+        id: response.data.tenant_id || tenantId,
+        phone_no: currentSupplier?.phone_no || '',
+        name: currentSupplier?.name || '',
+        brand_name: currentSupplier?.brand_name || '',
+        fcm_token: currentSupplier?.fcm_token || ''
+      };
+      
+      // Persist supplier data to storage
+      await setSecureItem('supplierData', JSON.stringify(supplierData));
+      console.log('💾 Saved supplier data after PIN setup:', supplierData);
+      
+      return {
+        ...response.data,
+        supplier: supplierData
+      };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to setup PIN');
     }
@@ -133,10 +163,10 @@ export const loginWithPIN = createAsyncThunk(
       
       // Map backend response to supplier object
       const supplierData = {
-        id: response.data.supplier_id,
+        id: response.data.tenant_id,
         phone_no: response.data.phone_number,
-        name: response.data.supplier_name,
-        brand_name: response.data.supplier_brand_name,
+        name: response.data.tenant_name,
+        brand_name: response.data.tenant_brand_name,
         fcm_token: response.data.fcm_token
       };
       
@@ -207,7 +237,7 @@ const authSlice = createSlice({
       .addCase(sendOTP.fulfilled, (state, action) => {
         state.loading = false;
         state.otpSent = true;
-        state.tempSupplierId = action.payload.supplier_id;
+        state.tempSupplierId = action.payload.tenant_id;
       })
       .addCase(sendOTP.rejected, (state, action) => {
         state.loading = false;
@@ -230,8 +260,14 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(setupPIN.fulfilled, (state) => {
+      .addCase(setupPIN.fulfilled, (state, action) => {
         state.loading = false;
+        // Set supplier data from the response
+        if (action.payload?.supplier) {
+          state.supplier = action.payload.supplier;
+          state.isAuthenticated = true;
+          console.log('✅ Supplier set in Redux:', action.payload.supplier);
+        }
       })
       .addCase(setupPIN.rejected, (state, action) => {
         state.loading = false;

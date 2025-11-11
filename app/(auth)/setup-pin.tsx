@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, HelperText } from 'react-native-paper';
+import { TextInput, Button, Text, HelperText, Dialog, Portal } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import { setupPIN } from '@/store/slices/authSlice';
@@ -10,6 +10,8 @@ export default function SetupPinScreen() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
+  const [showCodeDialog, setShowCodeDialog] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const { loading, supplier, tempSupplierId, error } = useSelector((state: RootState) => state.auth);
 
@@ -26,11 +28,23 @@ export default function SetupPinScreen() {
 
     const supplierId = tempSupplierId || supplier?.id;
     if (supplierId) {
-      const result = await dispatch(setupPIN({ supplierId: Number(supplierId), pin }));
+      const result = await dispatch(setupPIN({ tenantId: Number(supplierId), pin }));
       if (setupPIN.fulfilled.match(result)) {
-        router.replace('/(tabs)');
+        console.log('✅ Setup PIN result:', result.payload);
+        // Check if referral_code exists in the response
+        if (result.payload?.referral_code) {
+          setSupplierCode(result.payload.referral_code);
+          setShowCodeDialog(true);
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     }
+  };
+
+  const handleContinue = () => {
+    setShowCodeDialog(false);
+    router.replace('/(tabs)');
   };
 
   return (
@@ -88,6 +102,30 @@ export default function SetupPinScreen() {
           Setup PIN
         </Button>
       </View>
+
+      <Portal>
+        <Dialog visible={showCodeDialog} dismissable={false}>
+          <Dialog.Title style={styles.dialogTitle}>
+            Registration Successful! 🎉
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={styles.dialogText}>
+              Your referral code is:
+            </Text>
+            <Text variant="displayMedium" style={styles.supplierCode}>
+              {supplierCode}
+            </Text>
+            <Text variant="bodySmall" style={styles.dialogNote}>
+              Share this code with others to refer them!
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button mode="contained" onPress={handleContinue}>
+              Continue to Dashboard
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </KeyboardAvoidingView>
   );
 }
@@ -117,5 +155,26 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 8,
+  },
+  dialogTitle: {
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  dialogText: {
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#666',
+  },
+  supplierCode: {
+    textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#2196F3',
+    marginVertical: 16,
+    letterSpacing: 4,
+  },
+  dialogNote: {
+    textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
   },
 });

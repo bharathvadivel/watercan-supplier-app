@@ -58,8 +58,12 @@ export default function AddDeliveryPersonScreen() {
       
       console.log('✅ Add delivery person response:', JSON.stringify(addResponse.data, null, 2));
       
-      // Backend returns passcode directly in the add response
-      const deliveryPerson = addResponse.data.delivery_person;
+      // Backend returns tenant object in the add response
+      const deliveryPerson = addResponse.data.tenant || addResponse.data.delivery_person;
+      
+      if (!deliveryPerson) {
+        throw new Error('Invalid response from server');
+      }
       
       setDeliveryPersonData({
         name: deliveryPerson.name || name,

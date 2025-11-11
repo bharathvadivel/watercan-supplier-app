@@ -66,20 +66,20 @@ export default function CustomerDetailsScreen() {
           <View style={styles.customerHeader}>
             <View>
               <Text variant="headlineSmall" style={styles.customerName}>
-                {selectedCustomer.name}
+                {selectedCustomer.customer_name}
               </Text>
               <Text variant="bodyMedium" style={styles.phoneNumber}>
-                {selectedCustomer.phoneNumber}
+                {selectedCustomer.customer_phone}
               </Text>
             </View>
             <Chip
               mode="flat"
               style={
-                selectedCustomer.isOnboarded
+                selectedCustomer.profile_status
                   ? styles.onboardedChip
                   : styles.pendingChip
               }>
-              {selectedCustomer.isOnboarded ? 'Active' : 'Pending'}
+              {selectedCustomer.profile_status ? 'Active' : 'Pending'}
             </Chip>
           </View>
 
@@ -91,15 +91,15 @@ export default function CustomerDetailsScreen() {
                 Per Can Amount
               </Text>
               <Text variant="titleMedium" style={styles.detailValue}>
-                ₹{selectedCustomer.perCanAmount}
+                ₹{selectedCustomer.per_can_amount}
               </Text>
             </View>
             <View style={styles.detailItem}>
               <Text variant="bodySmall" style={styles.detailLabel}>
-                Max Can Amount
+                Refill Frequency
               </Text>
               <Text variant="titleMedium" style={styles.detailValue}>
-                {selectedCustomer.maxCanAmount}
+                {selectedCustomer.refill_frequency} days
               </Text>
             </View>
             <View style={styles.detailItem}>
@@ -107,7 +107,7 @@ export default function CustomerDetailsScreen() {
                 Bill Type
               </Text>
               <Text variant="titleMedium" style={styles.detailValue}>
-                {selectedCustomer.billType.toUpperCase()}
+                {selectedCustomer.billing_type.toUpperCase()}
               </Text>
             </View>
           </View>
@@ -122,7 +122,7 @@ export default function CustomerDetailsScreen() {
               <Text
                 variant="titleMedium"
                 style={[styles.detailValue, styles.dueText]}>
-                ₹{selectedCustomer.balanceDue}
+                ₹{selectedCustomer.due_amount}
               </Text>
             </View>
             <View style={styles.detailItem}>
@@ -132,15 +132,15 @@ export default function CustomerDetailsScreen() {
               <Text
                 variant="titleMedium"
                 style={[styles.detailValue, styles.creditText]}>
-                ₹{selectedCustomer.creditAmount}
+                ₹{selectedCustomer.credit_amount}
               </Text>
             </View>
             <View style={styles.detailItem}>
               <Text variant="bodySmall" style={styles.detailLabel}>
-                Advance Paid
+                Address
               </Text>
               <Text variant="titleMedium" style={styles.detailValue}>
-                ₹{selectedCustomer.advanceAmountPaid}
+                {selectedCustomer.customer_area}
               </Text>
             </View>
           </View>
@@ -164,7 +164,7 @@ export default function CustomerDetailsScreen() {
                     {order.status}
                   </Chip>
                 )}
-                onPress={() => router.push(`/orders/${order.id}`)}
+                // onPress={() => router.push(`/orders/${order.id}`)}
               />
             ))
           ) : (
