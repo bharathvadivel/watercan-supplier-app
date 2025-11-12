@@ -101,10 +101,16 @@ export const addCustomer = createAsyncThunk(
   'customers/addCustomer',
   async (customerData: Omit<Customer, 'id' | 'createdAt'>, { rejectWithValue }) => {
     try {
+      console.log('🔵 Calling customer API with data:', JSON.stringify(customerData, null, 2));
       const response = await customerAPI.createCustomer(customerData);
+      console.log('✅ Customer API response:', JSON.stringify(response.data, null, 2));
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to add customer');
+      console.error('❌ Customer API Error:', error);
+      console.error('❌ Error response data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
+      return rejectWithValue(error.response?.data?.message || error.response?.data || 'Failed to add customer');
     }
   }
 );

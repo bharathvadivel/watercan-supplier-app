@@ -4,6 +4,7 @@ export interface Supplier {
   phone_no: string;
   phoneNumber?: string;
   brand_name?: string;
+  tenant_code?: string;
   fcm_token?: string;
   pin?: string;
   createdAt?: string;

@@ -34,10 +34,31 @@ export default function AddCustomerScreen() {
   const [advancePaidDate, setAdvancePaidDate] = useState('');
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [tempOTP, setTempOTP] = useState('');
+  const [lastAddedCustomer, setLastAddedCustomer] = useState({ name: '', phone: '' });
 
   const dispatch = useDispatch<AppDispatch>();
   const { loading, error } = useSelector((state: RootState) => state.customers);
   const { supplier, tempSupplierId } = useSelector((state: RootState) => state.auth);
+
+  const clearForm = () => {
+    setName('');
+    setPhoneNumber('');
+    setAddress('');
+    setPerCanAmount('');
+    setRefillFrequency('');
+    setBillingType('monthly');
+    setArea('');
+    setLandmark('');
+    setCity('');
+    setState('');
+    setPincode('');
+    setAdvanceAmtType('no');
+    setTotalCanAssigned('');
+    setPerCanAdvanceAmount('');
+    setTotalAdvanceAmount('');
+    setAdvancePaidDate('');
+    setTempOTP('');
+  }
 
   const handleSubmit = async () => {
     console.log('🔵 Add Customer button clicked');
@@ -54,7 +75,7 @@ export default function AddCustomerScreen() {
     }
 
     const customerData: any = {
-      supplier_id: supplierId,
+      tenant_id: supplierId,
       phone_number: phoneNumber,
       customer_name: name,
       customer_address: address,
@@ -85,22 +106,29 @@ export default function AddCustomerScreen() {
       
       if (addCustomer.fulfilled.match(result)) {
         console.log('✅ Customer added successfully:', result.payload);
+        // Save customer info before clearing
+        setLastAddedCustomer({ name, phone: phoneNumber });
+        clearForm();
         setShowSuccessDialog(true);
       } else {
         console.log('❌ Add customer failed:', result);
+        console.log('❌ Error payload:', result.payload);
+        console.log('❌ Error type:', result.error);
+        // Show the actual error message from the backend
+        const errorMessage = typeof result.payload === 'string' 
+          ? result.payload 
+          : (result.payload as any)?.message || JSON.stringify(result.payload);
+        alert(`Failed to add customer: ${errorMessage}`);
       }
     } catch (error) {
       console.error('❌ Error adding customer:', error);
+      alert('An unexpected error occurred while adding customer');
     }
   };
 
   const handleDialogClose = () => {
     setShowSuccessDialog(false);
-    // Refresh customers list after adding
-    if (supplier?.id) {
-      dispatch(fetchCustomers(supplier.id));
-    }
-    router.back();
+    // Keep the form cleared - don't need to clear again
   };
 
   return (
@@ -109,7 +137,7 @@ export default function AddCustomerScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Button mode="text" onPress={() => router.back()}>
+          <Button mode="text" onPress={() => router.push('/(tabs)')}>
             Back
           </Button>
           <Text variant="headlineMedium" style={styles.title}>
@@ -306,25 +334,27 @@ export default function AddCustomerScreen() {
 
       <Portal>
         <Dialog visible={showSuccessDialog} onDismiss={handleDialogClose}>
-          <Dialog.Title>Customer Added Successfully</Dialog.Title>
+          <Dialog.Title>✅ Customer Added Successfully</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              Customer "{name}" has been added successfully!
+            <Text variant="bodyMedium" style={{ marginBottom: 16 }}>
+              Customer has been added successfully! You can now add another customer.
             </Text>
-            <View style={styles.otpContainer}>
-              <Text variant="bodySmall" style={styles.otpLabel}>
-                Phone Number:
-              </Text>
-              <Text variant="titleMedium" style={styles.otpValue}>
-                {phoneNumber}
-              </Text>
-              <Text variant="bodySmall" style={styles.otpLabel}>
-                Customer Name:
-              </Text>
-              <Text variant="titleMedium" style={styles.otpValue}>
-                {name}
-              </Text>
-            </View>
+            {lastAddedCustomer.name && (
+              <View style={styles.otpContainer}>
+                <Text variant="bodySmall" style={styles.otpLabel}>
+                  Customer Name:
+                </Text>
+                <Text variant="titleMedium" style={styles.otpValue}>
+                  {lastAddedCustomer.name}
+                </Text>
+                <Text variant="bodySmall" style={styles.otpLabel}>
+                  Phone Number:
+                </Text>
+                <Text variant="titleMedium" style={styles.otpValue}>
+                  {lastAddedCustomer.phone}
+                </Text>
+              </View>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={handleDialogClose}>OK</Button>

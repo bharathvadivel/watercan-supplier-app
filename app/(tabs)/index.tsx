@@ -48,6 +48,7 @@ export default function DashboardScreen() {
         const name = apiSupplier.tenant_name || apiSupplier.tenant_brand_name || '';
         setTenantName(name);
         console.log('📊 Setting tenant name:', name);
+        console.log('📊 Tenant code from API:', apiSupplier.tenant_code);
         
         // Update Redux state with latest supplier data
         if (apiSupplier.tenant_name || apiSupplier.tenant_brand_name) {
@@ -56,6 +57,7 @@ export default function DashboardScreen() {
             phone_no: apiSupplier.phone_no,
             name: apiSupplier.tenant_name,
             brand_name: apiSupplier.tenant_brand_name,
+            tenant_code: apiSupplier.tenant_code,
             fcm_token: supplier.fcm_token || ''
           }));
         }

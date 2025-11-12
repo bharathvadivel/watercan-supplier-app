@@ -49,10 +49,10 @@ const initialState: AuthState = {
 
 export const sendOTP = createAsyncThunk(
   'auth/sendOTP',
-  async ({ phoneNumber, name, brandName, tenantType }: { phoneNumber: string; name: string; brandName?: string; tenantType: string }, { rejectWithValue }) => {
+  async ({ phoneNumber, name, brandName }: { phoneNumber: string; name: string; brandName?: string }, { rejectWithValue }) => {
     try {
-      console.log('🚀 Sending OTP to:', phoneNumber, 'Name:', name, 'Brand Name:', brandName, 'Tenant Type:', tenantType);
-      const sendResponse = await authAPI.sendOTP(phoneNumber, name, brandName, tenantType);
+      console.log('🚀 Sending OTP to:', phoneNumber, 'Name:', name, 'Brand Name:', brandName);
+      const sendResponse = await authAPI.sendOTP(phoneNumber, name, brandName);
       console.log('📦 OTP Send Response:', sendResponse.data);
       console.log('🔑 Tenant ID from response:', sendResponse.data.tenant_id);
       console.log('🔍 Full response data:', JSON.stringify(sendResponse.data, null, 2));

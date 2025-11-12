@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, HelperText, Menu, Divider } from 'react-native-paper';
+import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import { sendOTP, verifyOTPAndSignup } from '@/store/slices/authSlice';
@@ -10,8 +10,6 @@ export default function SignupScreen() {
   const [name, setName] = useState('');
   const [brandName, setBrandName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [tenantType, setTenantType] = useState('');
-  const [menuVisible, setMenuVisible] = useState(false);
   const [otp, setOtp] = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const { loading, error, otpSent, tempSupplierId } = useSelector((state: RootState) => state.auth);
@@ -21,15 +19,15 @@ export default function SignupScreen() {
   }, [loading, error, otpSent, tempSupplierId]);
 
   useEffect(() => {
-    console.log('📝 Component state:', { name, brandName, phoneNumber, tenantType, otp });
-  }, [name, brandName, phoneNumber, tenantType, otp]);
+    console.log('📝 Component state:', { name, brandName, phoneNumber, otp });
+  }, [name, brandName, phoneNumber, otp]);
 
   const handleSendOTP = async () => {
     console.log('📤 Send OTP clicked');
-    console.log('📊 Phone:', phoneNumber, 'Name:', name, 'Brand Name:', brandName, 'Tenant Type:', tenantType);
-    if (phoneNumber.length === 10 && name.trim() && tenantType) {
+    console.log('📊 Phone:', phoneNumber, 'Name:', name, 'Brand Name:', brandName);
+    if (phoneNumber.length === 10 && name.trim()) {
       console.log('✅ Sending OTP...');
-      const result = await dispatch(sendOTP({ phoneNumber, name, brandName, tenantType }));
+      const result = await dispatch(sendOTP({ phoneNumber, name, brandName }));
       console.log('📦 Send OTP result:', result);
       if (sendOTP.fulfilled.match(result)) {
         console.log('✅ OTP sent successfully');
@@ -111,36 +109,6 @@ export default function SignupScreen() {
           disabled={otpSent}
         />
 
-        <Menu
-          visible={menuVisible}
-          onDismiss={() => setMenuVisible(false)}
-          anchor={
-            <Button
-              mode="outlined"
-              onPress={() => setMenuVisible(true)}
-              disabled={otpSent}
-              style={styles.input}
-              contentStyle={styles.dropdownButton}>
-              {tenantType || 'Select Tenant Type'}
-            </Button>
-          }>
-          <Menu.Item
-            onPress={() => {
-              setTenantType('Supplier');
-              setMenuVisible(false);
-            }}
-            title="Supplier"
-          />
-          <Divider />
-          <Menu.Item
-            onPress={() => {
-              setTenantType('Delivery');
-              setMenuVisible(false);
-            }}
-            title="Delivery"
-          />
-        </Menu>
-
         {error && <HelperText type="error" visible={true}>{error}</HelperText>}
 
         {!otpSent ? (
@@ -148,7 +116,7 @@ export default function SignupScreen() {
             mode="contained"
             onPress={handleSendOTP}
             loading={loading}
-            disabled={loading || phoneNumber.length !== 10 || !name.trim() || !tenantType}
+            disabled={loading || phoneNumber.length !== 10 || !name.trim()}
             style={styles.button}>
             Send OTP
           </Button>
@@ -219,9 +187,6 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
-  },
-  dropdownButton: {
-    justifyContent: 'flex-start',
   },
   button: {
     marginTop: 8,

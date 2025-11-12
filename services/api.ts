@@ -91,13 +91,12 @@ apiClient.interceptors.response.use(
 );
 
 export const authAPI = {
-  sendOTP: (phoneNumber: string, name: string, brandName: string | undefined, tenantType: string) => {
-    console.log('API: Sending phone number:', phoneNumber, 'Name:', name, 'Brand Name:', brandName, 'Tenant Type:', tenantType, 'Type:', typeof phoneNumber, 'Length:', phoneNumber.length);
+  sendOTP: (phoneNumber: string, name: string, brandName?: string) => {
+    console.log('API: Sending phone number:', phoneNumber, 'Name:', name, 'Brand Name:', brandName, 'Type:', typeof phoneNumber, 'Length:', phoneNumber.length);
     
     const requestBody: any = {
-      phone_number: phoneNumber,
-      name: name,
-      tenant_type: tenantType.toLowerCase()
+      phone_number: `+91 ${phoneNumber}`,
+      name: name
     };
     
     // Only add brand_name if it's provided
@@ -105,6 +104,7 @@ export const authAPI = {
       requestBody.brand_name = brandName;
     }
     
+    console.log('📤 Request body for /tenant/send-otp:', JSON.stringify(requestBody, null, 2));
     return apiClient.post('/tenant/send-otp', requestBody);
   },
 
@@ -161,19 +161,19 @@ export const orderAPI = {
     return apiClient.get(`/tenant/pending-orders?supplier_id=${supplierId}`);
   },
 
-  getPendingOrders: (supplierId: number) => {
-    console.log('📦 Fetching pending orders for supplier_id:', supplierId);
-    return publicApiClient.get(`/tenant/pending-orders?supplier_id=${supplierId}`);
+  getPendingOrders: (tenantCode: string) => {
+    console.log('📦 Fetching pending orders for tenant_code:', tenantCode);
+    return publicApiClient.get(`/tenant/pending-orders?tenant_code=${tenantCode}`);
   },
   
-  getAcceptedOrders: (supplierId: number) => {
-    console.log('📦 Fetching accepted orders for supplier_id:', supplierId);
-    return publicApiClient.get(`/tenant/accepted-orders?supplier_id=${supplierId}`);
+  getAcceptedOrders: (tenantCode: string) => {
+    console.log('📦 Fetching accepted orders for tenant_code:', tenantCode);
+    return publicApiClient.get(`/tenant/accepted-orders?tenant_code=${tenantCode}`);
   },
   
-  getDeliveredOrders: (supplierId: number) => {
-    console.log('📦 Fetching delivered orders for supplier_id:', supplierId);
-    return publicApiClient.get(`/tenant/delivered-orders?supplier_id=${supplierId}`);
+  getDeliveredOrders: (tenantCode: string) => {
+    console.log('📦 Fetching delivered orders for tenant_code:', tenantCode);
+    return publicApiClient.get(`/tenant/delivered-orders?tenant_code=${tenantCode}`);
   },
 
   getOrderStatus: (orderId: number) => {
@@ -181,20 +181,29 @@ export const orderAPI = {
     return publicApiClient.get(`/tenant/order-status/${orderId}`);
   },
 
-  acceptOrder: (data: { order_id: number; supplier_id: number; delivery_person_id: number }) => {
-    console.log('✅ Accepting order:', data);
-    return publicApiClient.post('/tenant/accept-order', data);
+  acceptOrder: (data: { order_id: number; tenant_id: number; tenant_code: string }) => {
+    console.log('✅ ===== ACCEPT ORDER API CALL =====');
+    console.log('✅ Accepting order with data:', JSON.stringify(data, null, 2));
+    console.log('✅ Endpoint: POST /tenant/accept-order');
+    console.log('✅ Request body keys:', Object.keys(data));
+    console.log('✅ Request body values:', Object.values(data));
+    return apiClient.post('/tenant/accept-order', data);
   },
 
   completeOrder: (data: {
     order_id: number;
-    supplier_id: number;
+    tenant_id: number;
+    tenant_code: string;
     bill_status: string;
     payment_mode: string;
-    amount_paid: string;
+    amount_paid: number;
+    credit_amount: number;
+    due_amount: number;
   }) => {
-    console.log('🎉 Completing order:', data);
-    return publicApiClient.post('/tenant/complete-order', data);
+    console.log('🎉 ===== COMPLETE ORDER API CALL =====');
+    console.log('🎉 Completing order with data:', JSON.stringify(data, null, 2));
+    console.log('🎉 Endpoint: POST /tenant/complete-order');
+    return apiClient.post('/tenant/complete-order', data);
   },
 
   updateOrderStatus: (orderId: string, status: string) =>
@@ -230,14 +239,14 @@ export const notificationAPI = {
 };
 
 export const dashboardAPI = {
-  getMetrics: (supplierId: number) => {
-    console.log('📊 Dashboard API - Getting metrics for tenant_id:', supplierId);
-    return apiClient.get(`/tenant/dashboard/${supplierId}`);
+  getMetrics: (tenant_id: number) => {
+    console.log('📊 Dashboard API - Getting metrics for tenant_id:', tenant_id);
+    return apiClient.get(`/tenant/dashboard/${tenant_id}`);
   },
 };
 
 export const deliveryPersonAPI = {
-  addDeliveryPerson: (data: { supplier_id: number; name: string; phone_number: string }) =>
+  addDeliveryPerson: (data: { name: string; phone_number: string; tenant_code: string; brand_name: string }) =>
     apiClient.post('/delivery-person/add', data),
   
   getPasscode: (deliveryPersonId: number) =>
