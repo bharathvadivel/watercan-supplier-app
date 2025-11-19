@@ -48,6 +48,25 @@ export async function registerForPushNotificationsAsync() {
   return token;
 }
 
+export async function showOTPNotification(otp: string) {
+  if (Platform.OS === 'web') {
+    // For web, just log to console and show alert
+    console.log('🔐 Your OTP Code:', otp);
+    alert(`Your OTP Code: ${otp}`);
+    return;
+  }
+  
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Your OTP Code',
+      body: `Your verification code is: ${otp}`,
+      data: { otp },
+      sound: true,
+    },
+    trigger: null, // Show immediately
+  });
+}
+
 export function setupNotificationListeners(
   onNotificationReceived: (notification: Notifications.Notification) => void,
   onNotificationResponse: (response: Notifications.NotificationResponse) => void

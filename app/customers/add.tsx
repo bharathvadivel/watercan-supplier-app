@@ -12,50 +12,123 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
-import { addCustomer } from '@/store/slices/customerSlice';
+import { addCustomer, fetchCustomers } from '@/store/slices/customerSlice';
 import { customerAPI } from '@/services/api';
 
 export default function AddCustomerScreen() {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [address, setAddress] = useState('');
   const [perCanAmount, setPerCanAmount] = useState('');
-  const [maxCanAmount, setMaxCanAmount] = useState('');
-  const [advanceAmountPaid, setAdvanceAmountPaid] = useState('');
-  const [billType, setBillType] = useState<'prepaid' | 'postpaid'>('prepaid');
+  const [refillFrequency, setRefillFrequency] = useState('');
+  const [billingType, setBillingType] = useState<'monthly' | 'regular'>('monthly');
+  const [area, setArea] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [advanceAmtType, setAdvanceAmtType] = useState<'yes' | 'no'>('no');
+  const [totalCanAssigned, setTotalCanAssigned] = useState('');
+  const [perCanAdvanceAmount, setPerCanAdvanceAmount] = useState('');
+  const [totalAdvanceAmount, setTotalAdvanceAmount] = useState('');
+  const [advancePaidDate, setAdvancePaidDate] = useState('');
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [tempOTP, setTempOTP] = useState('');
+  const [lastAddedCustomer, setLastAddedCustomer] = useState({ name: '', phone: '' });
 
   const dispatch = useDispatch<AppDispatch>();
   const { loading, error } = useSelector((state: RootState) => state.customers);
-  const { supplier } = useSelector((state: RootState) => state.auth);
+  const { supplier, tempSupplierId } = useSelector((state: RootState) => state.auth);
+
+  const clearForm = () => {
+    setName('');
+    setPhoneNumber('');
+    setAddress('');
+    setPerCanAmount('');
+    setRefillFrequency('');
+    setBillingType('monthly');
+    setArea('');
+    setLandmark('');
+    setCity('');
+    setState('');
+    setPincode('');
+    setAdvanceAmtType('no');
+    setTotalCanAssigned('');
+    setPerCanAdvanceAmount('');
+    setTotalAdvanceAmount('');
+    setAdvancePaidDate('');
+    setTempOTP('');
+  }
 
   const handleSubmit = async () => {
-    if (!supplier?.id) return;
+    console.log('🔵 Add Customer button clicked');
+    console.log('🔵 tempSupplierId:', tempSupplierId);
+    console.log('🔵 supplier object:', supplier);
+    console.log('🔵 supplier.id:', supplier?.id);
+    const supplierId = tempSupplierId || supplier?.id;
+    console.log('🔵 Final Supplier ID:', supplierId);
+    
+    if (!supplierId) {
+      console.log('❌ No supplier ID found');
+      console.log('❌ Please login first to get supplier ID');
+      return;
+    }
 
-    const customerData = {
-      supplierId: supplier.id,
-      name,
-      phoneNumber,
-      perCanAmount: parseFloat(perCanAmount),
-      maxCanAmount: parseFloat(maxCanAmount),
-      advanceAmountPaid: parseFloat(advanceAmountPaid || '0'),
-      billType,
-      balanceDue: 0,
-      creditAmount: parseFloat(advanceAmountPaid || '0'),
-      isOnboarded: false,
+    const customerData: any = {
+      tenant_id: supplierId,
+      phone_number: phoneNumber,
+      customer_name: name,
+      customer_address: address,
+      per_can_amount: parseFloat(perCanAmount),
+      refill_frequency: parseInt(refillFrequency),
+      billing_type: billingType,
+      area,
+      landmark,
+      city,
+      state,
+      pincode,
+      advance_amt_type: advanceAmtType,
     };
 
-    const result = await dispatch(addCustomer(customerData));
-    if (addCustomer.fulfilled.match(result)) {
-      const response = await customerAPI.sendCustomerOTP(result.payload.id);
-      setTempOTP(response.data.otp);
-      setShowSuccessDialog(true);
+    // Only include advance payment fields if advance_amt_type is "yes"
+    if (advanceAmtType === 'yes') {
+      customerData.total_can_assigned = parseInt(totalCanAssigned);
+      customerData.per_can_advance_amount = parseFloat(perCanAdvanceAmount);
+      customerData.total_advance_amount = parseFloat(totalAdvanceAmount);
+      customerData.advance_paid_date = advancePaidDate;
+    }
+
+    console.log('🔵 Customer Data to be sent:', JSON.stringify(customerData, null, 2));
+
+    try {
+      const result = await dispatch(addCustomer(customerData));
+      console.log('🔵 Add Customer Result:', result);
+      
+      if (addCustomer.fulfilled.match(result)) {
+        console.log('✅ Customer added successfully:', result.payload);
+        // Save customer info before clearing
+        setLastAddedCustomer({ name, phone: phoneNumber });
+        clearForm();
+        setShowSuccessDialog(true);
+      } else {
+        console.log('❌ Add customer failed:', result);
+        console.log('❌ Error payload:', result.payload);
+        console.log('❌ Error type:', result.error);
+        // Show the actual error message from the backend
+        const errorMessage = typeof result.payload === 'string' 
+          ? result.payload 
+          : (result.payload as any)?.message || JSON.stringify(result.payload);
+        alert(`Failed to add customer: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error('❌ Error adding customer:', error);
+      alert('An unexpected error occurred while adding customer');
     }
   };
 
   const handleDialogClose = () => {
     setShowSuccessDialog(false);
-    router.back();
+    // Keep the form cleared - don't need to clear again
   };
 
   return (
@@ -64,7 +137,7 @@ export default function AddCustomerScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Button mode="text" onPress={() => router.back()}>
+          <Button mode="text" onPress={() => router.push('/(tabs)')}>
             Back
           </Button>
           <Text variant="headlineMedium" style={styles.title}>
@@ -74,7 +147,7 @@ export default function AddCustomerScreen() {
 
         <View style={styles.form}>
           <TextInput
-            label="Customer Name"
+            label="Customer Name *"
             value={name}
             onChangeText={setName}
             mode="outlined"
@@ -82,7 +155,7 @@ export default function AddCustomerScreen() {
           />
 
           <TextInput
-            label="Phone Number"
+            label="Phone Number *"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             mode="outlined"
@@ -92,7 +165,59 @@ export default function AddCustomerScreen() {
           />
 
           <TextInput
-            label="Per Can Amount (₹)"
+            label="Address *"
+            value={address}
+            onChangeText={setAddress}
+            mode="outlined"
+            multiline
+            numberOfLines={3}
+            style={styles.input}
+          />
+
+          <TextInput
+            label="Area *"
+            value={area}
+            onChangeText={setArea}
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <TextInput
+            label="Landmark"
+            value={landmark}
+            onChangeText={setLandmark}
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <TextInput
+            label="City *"
+            value={city}
+            onChangeText={setCity}
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <TextInput
+            label="State *"
+            value={state}
+            onChangeText={setState}
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <TextInput
+            label="Pincode *"
+            value={pincode}
+            onChangeText={setPincode}
+            mode="outlined"
+            keyboardType="numeric"
+            maxLength={6}
+            style={styles.input}
+          />
+
+          <TextInput
+            label="Per Can Amount (₹) *"
             value={perCanAmount}
             onChangeText={setPerCanAmount}
             mode="outlined"
@@ -101,35 +226,86 @@ export default function AddCustomerScreen() {
           />
 
           <TextInput
-            label="Max Can Amount"
-            value={maxCanAmount}
-            onChangeText={setMaxCanAmount}
-            mode="outlined"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-
-          <TextInput
-            label="Advance Amount Paid (₹)"
-            value={advanceAmountPaid}
-            onChangeText={setAdvanceAmountPaid}
+            label="Refill Frequency (days) *"
+            value={refillFrequency}
+            onChangeText={setRefillFrequency}
             mode="outlined"
             keyboardType="numeric"
             style={styles.input}
           />
 
           <Text variant="bodyMedium" style={styles.label}>
-            Bill Type
+            Billing Type *
           </Text>
           <SegmentedButtons
-            value={billType}
-            onValueChange={(value) => setBillType(value as 'prepaid' | 'postpaid')}
+            value={billingType}
+            onValueChange={(value) => setBillingType(value as 'monthly' | 'regular')}
             buttons={[
-              { value: 'prepaid', label: 'Prepaid' },
-              { value: 'postpaid', label: 'Postpaid' },
+              { value: 'monthly', label: 'Monthly' },
+              { value: 'regular', label: 'Regular' },
             ]}
             style={styles.segmentedButtons}
           />
+
+          <Text variant="bodyMedium" style={styles.label}>
+            Advance Payment *
+          </Text>
+          <SegmentedButtons
+            value={advanceAmtType}
+            onValueChange={(value) => setAdvanceAmtType(value as 'yes' | 'no')}
+            buttons={[
+              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: 'No' },
+            ]}
+            style={styles.segmentedButtons}
+          />
+
+          {advanceAmtType === 'yes' && (
+            <>
+              <TextInput
+                label="Total Cans Assigned *"
+                value={totalCanAssigned}
+                onChangeText={setTotalCanAssigned}
+                mode="outlined"
+                keyboardType="numeric"
+                style={styles.input}
+              />
+
+              <TextInput
+                label="Per Can Advance Amount (₹) *"
+                value={perCanAdvanceAmount}
+                onChangeText={(value) => {
+                  setPerCanAdvanceAmount(value);
+                  if (value && totalCanAssigned) {
+                    const total = parseFloat(value) * parseInt(totalCanAssigned);
+                    setTotalAdvanceAmount(total.toString());
+                  }
+                }}
+                mode="outlined"
+                keyboardType="numeric"
+                style={styles.input}
+              />
+
+              <TextInput
+                label="Total Advance Amount (₹)"
+                value={totalAdvanceAmount}
+                onChangeText={setTotalAdvanceAmount}
+                mode="outlined"
+                keyboardType="numeric"
+                editable={false}
+                style={styles.input}
+              />
+
+              <TextInput
+                label="Advance Paid Date (YYYY-MM-DD) *"
+                value={advancePaidDate}
+                onChangeText={setAdvancePaidDate}
+                mode="outlined"
+                placeholder="2025-10-10"
+                style={styles.input}
+              />
+            </>
+          )}
 
           {error && <HelperText type="error" visible={true}>{error}</HelperText>}
 
@@ -141,8 +317,14 @@ export default function AddCustomerScreen() {
               loading ||
               !name.trim() ||
               phoneNumber.length !== 10 ||
+              !address.trim() ||
+              !area.trim() ||
+              !city.trim() ||
+              !state.trim() ||
+              !pincode.trim() ||
               !perCanAmount ||
-              !maxCanAmount
+              !refillFrequency ||
+              (advanceAmtType === 'yes' && (!totalCanAssigned || !perCanAdvanceAmount || !advancePaidDate))
             }
             style={styles.submitButton}>
             Add Customer
@@ -152,30 +334,27 @@ export default function AddCustomerScreen() {
 
       <Portal>
         <Dialog visible={showSuccessDialog} onDismiss={handleDialogClose}>
-          <Dialog.Title>Customer Added Successfully</Dialog.Title>
+          <Dialog.Title>✅ Customer Added Successfully</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              Customer has been added successfully. Share the following details with the
-              customer:
+            <Text variant="bodyMedium" style={{ marginBottom: 16 }}>
+              Customer has been added successfully! You can now add another customer.
             </Text>
-            <View style={styles.otpContainer}>
-              <Text variant="bodySmall" style={styles.otpLabel}>
-                Phone Number:
-              </Text>
-              <Text variant="titleMedium" style={styles.otpValue}>
-                {phoneNumber}
-              </Text>
-              <Text variant="bodySmall" style={styles.otpLabel}>
-                Temporary OTP:
-              </Text>
-              <Text variant="titleLarge" style={styles.otpValue}>
-                {tempOTP}
-              </Text>
-            </View>
-            <Text variant="bodySmall" style={styles.otpNote}>
-              Ask the customer to login with their phone number and this OTP to complete
-              onboarding.
-            </Text>
+            {lastAddedCustomer.name && (
+              <View style={styles.otpContainer}>
+                <Text variant="bodySmall" style={styles.otpLabel}>
+                  Customer Name:
+                </Text>
+                <Text variant="titleMedium" style={styles.otpValue}>
+                  {lastAddedCustomer.name}
+                </Text>
+                <Text variant="bodySmall" style={styles.otpLabel}>
+                  Phone Number:
+                </Text>
+                <Text variant="titleMedium" style={styles.otpValue}>
+                  {lastAddedCustomer.phone}
+                </Text>
+              </View>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={handleDialogClose}>OK</Button>

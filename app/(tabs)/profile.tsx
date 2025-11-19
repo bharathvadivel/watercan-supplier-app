@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Card, Text, Button, List, Avatar } from 'react-native-paper';
+import { Card, Text, Button, List, Avatar, Switch } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
@@ -9,6 +10,13 @@ export default function ProfileScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { supplier } = useSelector((state: RootState) => state.auth);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  const handleToggleNotifications = () => {
+    setNotificationsEnabled(!notificationsEnabled);
+    // TODO: Save preference to backend or local storage
+    console.log('Notifications:', !notificationsEnabled ? 'Enabled' : 'Disabled');
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -46,13 +54,23 @@ export default function ProfileScreen() {
             <List.Item
               title="Notifications"
               left={(props) => <List.Icon {...props} icon="bell" />}
-              right={() =>
-                unreadCount > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{unreadCount}</Text>
-                  </View>
-                ) : null
-              }
+              right={() => (
+                <View 
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                  onStartShouldSetResponder={() => true}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                >
+                  {unreadCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{unreadCount}</Text>
+                    </View>
+                  )}
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={handleToggleNotifications}
+                  />
+                </View>
+              )}
               onPress={() => router.push('/notifications')}
             />
             <List.Item
@@ -60,15 +78,16 @@ export default function ProfileScreen() {
               left={(props) => <List.Icon {...props} icon="cash" />}
               onPress={() => router.push('/payments/pending')}
             />
-            <List.Item
+            {/* <List.Item
               title="Payment History"
               left={(props) => <List.Icon {...props} icon="history" />}
               onPress={() => router.push('/payments/history')}
-            />
+            /> */}
           </List.Section>
         </Card.Content>
       </Card>
 
+      {/* Settings Card - Commented out until routes are created
       <Card style={styles.card} mode="elevated">
         <Card.Content>
           <List.Section>
@@ -90,6 +109,7 @@ export default function ProfileScreen() {
           </List.Section>
         </Card.Content>
       </Card>
+      */}
 
       <Button
         mode="contained"

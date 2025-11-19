@@ -1,31 +1,84 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Card, Text, Button } from 'react-native-paper';
+import { Card, Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { AppDispatch, RootState } from '@/store';
 import { dashboardAPI } from '@/services/api';
-import { useState } from 'react';
 import { DashboardMetrics } from '@/types';
+import { setSupplier } from '@/store/slices/authSlice';
 
 export default function DashboardScreen() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalCustomers: 0,
+    totalDeliveryPersons: 0,
     pendingPayments: 0,
     completedPayments: 0,
     activeOrders: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [tenantName, setTenantName] = useState<string>('');
+  const dispatch = useDispatch<AppDispatch>();
   const { supplier } = useSelector((state: RootState) => state.auth);
 
   const fetchMetrics = async () => {
-    if (!supplier?.id) return;
+    console.log('📊 Fetching dashboard metrics');
+    console.log('📊 Supplier object:', supplier);
+    console.log('📊 Supplier ID:', supplier?.id);
+    console.log('📊 Supplier name:', supplier?.name);
+    console.log('📊 Supplier brand_name:', supplier?.brand_name);
+    
+    if (!supplier?.id) {
+      console.log('❌ No supplier ID found');
+      return;
+    }
+    
     setLoading(true);
     try {
+      console.log('📊 Calling dashboard API with tenant_id:', supplier.id);
       const response = await dashboardAPI.getMetrics(supplier.id);
-      setMetrics(response.data);
+      console.log('📊 Dashboard metrics response:', response.data);
+      console.log('📊 Summary object:', response.data.summary);
+      console.log('📊 Customers array:', response.data.customers);
+      console.log('📊 Supplier from API:', response.data.supplier);
+      
+      // Update tenant name from API response
+      if (response.data.supplier) {
+        const apiSupplier = response.data.supplier;
+        const name = apiSupplier.tenant_name || apiSupplier.tenant_brand_name || '';
+        setTenantName(name);
+        console.log('📊 Setting tenant name:', name);
+        console.log('📊 Tenant code from API:', apiSupplier.tenant_code);
+        
+        // Update Redux state with latest supplier data
+        if (apiSupplier.tenant_name || apiSupplier.tenant_brand_name) {
+          dispatch(setSupplier({
+            id: apiSupplier.tenant_id,
+            phone_no: apiSupplier.phone_no,
+            name: apiSupplier.tenant_name,
+            brand_name: apiSupplier.tenant_brand_name,
+            tenant_code: apiSupplier.tenant_code,
+            fcm_token: supplier.fcm_token || ''
+          }));
+        }
+      }
+      
+      // Extract from summary object if exists, otherwise from root
+      const summary = response.data.summary || response.data;
+      
+      // Map backend response to metrics (handle both camelCase and snake_case)
+      const metricsData = {
+        totalCustomers: summary.totalCustomers || summary.total_customers || response.data.customers?.length || 0,
+        totalDeliveryPersons: summary.totalDeliveryPersons || summary.total_delivery_persons || summary.total_delivery_person || 0,
+        pendingPayments: summary.pendingPayments || summary.pending_payments || 0,
+        completedPayments: summary.completedPayments || summary.completed_payments || 0,
+        activeOrders: summary.activeOrders || summary.active_orders || 0,
+      };
+      
+      console.log('📊 Mapped metrics:', metricsData);
+      setMetrics(metricsData);
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
+      console.error('❌ Failed to fetch metrics:', error);
     } finally {
       setLoading(false);
     }
@@ -34,6 +87,25 @@ export default function DashboardScreen() {
   useEffect(() => {
     fetchMetrics();
   }, [supplier?.id]);
+
+  // Refresh metrics when tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (supplier?.id) {
+        fetchMetrics();
+      }
+    }, [supplier?.id])
+  );
+
+  // Show loading while supplier is being restored
+  if (!supplier) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 16 }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -46,7 +118,7 @@ export default function DashboardScreen() {
           Dashboard
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
-          Welcome back, {supplier?.name}
+          Welcome back, {tenantName || supplier?.name || supplier?.brand_name || 'User'}!
         </Text>
       </View>
 
@@ -58,6 +130,17 @@ export default function DashboardScreen() {
             </Text>
             <Text variant="displaySmall" style={styles.metricValue}>
               {metrics.totalCustomers}
+            </Text>
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.metricCard} mode="elevated">
+          <Card.Content>
+            <Text variant="bodyLarge" style={styles.metricLabel}>
+              Delivery Persons
+            </Text>
+            <Text variant="displaySmall" style={styles.metricValue}>
+              {metrics.totalDeliveryPersons}
             </Text>
           </Card.Content>
         </Card>
@@ -105,6 +188,12 @@ export default function DashboardScreen() {
           onPress={() => router.push('/customers/add')}
           style={styles.actionButton}>
           Add New Customer
+        </Button>
+        <Button
+          mode="contained"
+          onPress={() => router.push('/delivery/add')}
+          style={styles.actionButton}>
+          Add Delivery Person
         </Button>
         <Button
           mode="outlined"

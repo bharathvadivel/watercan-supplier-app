@@ -14,9 +14,16 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (phoneNumber.length === 10 && pin.length === 4) {
+      console.log('🔐 Login button clicked');
       const result = await dispatch(loginWithPIN({ phoneNumber, pin }));
+      console.log('🔐 Login result:', result);
+      
       if (loginWithPIN.fulfilled.match(result)) {
+        console.log('✅ Login successful!');
+        console.log('✅ Supplier data stored:', result.payload);
         router.replace('/(tabs)');
+      } else {
+        console.log('❌ Login failed:', result);
       }
     }
   };

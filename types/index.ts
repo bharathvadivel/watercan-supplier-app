@@ -1,24 +1,32 @@
 export interface Supplier {
-  id: string;
+  id: number;
   name: string;
-  phoneNumber: string;
+  phone_no: string;
+  phoneNumber?: string;
+  brand_name?: string;
+  tenant_code?: string;
+  fcm_token?: string;
   pin?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Customer {
-  id: string;
-  supplierId: string;
-  name: string;
-  phoneNumber: string;
-  perCanAmount: number;
-  maxCanAmount: number;
-  advanceAmountPaid: number;
-  billType: 'prepaid' | 'postpaid';
-  balanceDue: number;
-  creditAmount: number;
-  isOnboarded: boolean;
-  createdAt: string;
+  location_id: number;          // Unique ID for each customer location
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  customer_area: string;
+  landmark: string;
+  city: string;
+  state: string;
+  pincode: string;
+  per_can_amount: number;
+  refill_frequency: number;
+  billing_type: string;
+  credit_amount: number;
+  due_amount: number;
+  profile_status: boolean;
 }
 
 export interface Order {
@@ -48,6 +56,7 @@ export interface Payment {
 
 export interface DashboardMetrics {
   totalCustomers: number;
+  totalDeliveryPersons: number;
   pendingPayments: number;
   completedPayments: number;
   activeOrders: number;

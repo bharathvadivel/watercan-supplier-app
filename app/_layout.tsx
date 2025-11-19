@@ -9,11 +9,16 @@ import {
   registerForPushNotificationsAsync,
   setupNotificationListeners,
 } from '@/services/notifications';
+import { restoreSession } from '@/store/slices/authSlice';
 
 export default function RootLayout() {
   useFrameworkReady();
 
   useEffect(() => {
+    // Eagerly restore session on app start
+    console.log('🚀 App starting, restoring session...');
+    store.dispatch(restoreSession());
+    
     registerForPushNotificationsAsync();
 
     const cleanup = setupNotificationListeners(
