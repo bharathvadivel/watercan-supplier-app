@@ -97,14 +97,16 @@ export default function DashboardScreen() {
     }, [supplier?.id])
   );
 
-  // Show loading while supplier is being restored
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!supplier) {
+      console.log('🔒 Redirecting to login: supplier is null');
+      router.replace('/(auth)/login');
+    }
+  }, [supplier]);
   if (!supplier) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 16 }}>Loading...</Text>
-      </View>
-    );
+    console.log('🔒 supplier is null, returning null from DashboardScreen');
+    return null;
   }
 
   return (

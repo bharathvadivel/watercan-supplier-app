@@ -19,17 +19,13 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await dispatch(logout());
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
+    console.log('🚪 Logout button clicked');
+    (async () => {
+      console.log('🚪 Dispatching logout thunk...');
+      await dispatch(logout());
+      console.log('🚪 Logout thunk dispatched, navigating to login');
+      router.replace('/(auth)/login');
+    })();
   };
 
   return (
