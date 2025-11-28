@@ -69,13 +69,27 @@ export default function OrdersScreen() {
     // Handle both flat structure (pending) and nested structure (accepted/delivered)
     const isFlat = !!orderData.customer_name; // Flat structure has customer_name directly
     
+    // Prefer customer_address.customer_address, then customer_location.address, then previous logic
+    let address = '';
+    if (orderData.customer_address && orderData.customer_address.customer_address) {
+      address = orderData.customer_address.customer_address;
+      console.log(`📍 Using customer_address.customer_address for order #${orderData.order_id}:`, address);
+    } else if (orderData.customer_location && orderData.customer_location.address) {
+      address = orderData.customer_location.address;
+      console.log(`📍 Using customer_location.address for order #${orderData.order_id}:`, address);
+    } else if (!isFlat && orderData.customer?.address?.customer_address) {
+      address = orderData.customer?.address?.customer_address;
+      console.log(`📍 Using customer.address.customer_address for order #${orderData.order_id}:`, address);
+    } else {
+      console.log(`📍 No address found for order #${orderData.order_id}`);
+    }
     return {
       order_id: orderData.order_id,
       tenant_id: orderData.tenant_id,
       tenant_code: orderData.tenant_code,
       customer_name: isFlat ? orderData.customer_name : (orderData.customer?.customer_name || ''),
       customer_phone: isFlat ? orderData.customer_phone : (orderData.customer?.customer_phone || ''),
-      customer_address: isFlat ? '' : (orderData.customer?.address?.customer_address || ''),
+      customer_address: address,
       order_date: orderData.order_date,
       delivery_date: orderData.delivery_date,
       total_can_qty: isFlat ? orderData.total_can_qty : (orderData.order_details?.total_can_qty || 0),
@@ -428,6 +442,9 @@ export default function OrdersScreen() {
 
         <Text style={styles.customerName}>{item.customer_name}</Text>
         <Text>{item.customer_phone}</Text>
+        {item.customer_address ? (
+          <Text style={{ color: '#666', marginBottom: 2 }}>📍 {item.customer_address}</Text>
+        ) : null}
         <Text>Qty: {item.total_can_qty} cans • Total: ₹{item.total_price}</Text>
         <Text variant="bodySmall">{new Date(item.order_date).toLocaleDateString()}</Text>
 
